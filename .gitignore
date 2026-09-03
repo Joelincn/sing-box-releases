@@ -1,0 +1,9 @@
+*.tar.gz
+*.zip
+*.apk
+sing-box
+sing-box.exe
+.env
+*.log
+keystore.base64
+release.keystore

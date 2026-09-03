@@ -1,0 +1,429 @@
+name: Build sing-box for daily use
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. 1.14.0-Mustang.1)'
+        required: true
+      commit_hash:
+        description: 'Commit hash to build from (leave empty to use version tag)'
+        required: false
+        default: ''
+      build_windows:
+        description: 'Build Windows amd64'
+        required: false
+        type: boolean
+        default: true
+      build_linux_arm64:
+        description: 'Build Linux arm64'
+        required: false
+        type: boolean
+        default: true
+      build_android:
+        description: 'Build Android SFA (arm64)'
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.version }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: '1.26.7'
+
+jobs:
+  resolve_source:
+    name: Resolve sing-box source
+    runs-on: ubuntu-latest
+    outputs:
+      source_sha: ${{ steps.source.outputs.source_sha }}
+    steps:
+      - name: Checkout sing-box
+        uses: actions/checkout@v6
+        with:
+          repository: Joelincn/sing-box
+          ref: ${{ inputs.commit_hash != '' && inputs.commit_hash || format('v{0}', inputs.version) }}
+          path: sing-box
+          fetch-depth: 1
+
+      - name: Set build tag
+        run: git -C sing-box tag -f "v${{ github.event.inputs.version }}" "$(git -C sing-box rev-parse HEAD)"
+
+      - name: Resolve source commit
+        id: source
+        run: |
+          set -euo pipefail
+          if [[ ! "$INPUT_VERSION" =~ ^[0-9A-Za-z][0-9A-Za-z.+-]*$ ]]; then
+            echo "invalid version: $INPUT_VERSION" >&2
+            exit 1
+          fi
+          source_sha=$(git -C sing-box rev-parse HEAD)
+          echo "source_sha=${source_sha}" >> "$GITHUB_OUTPUT"
+          echo "Resolved sing-box source: ${source_sha}"
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+
+  build_cli:
+    if: ${{ github.event.inputs.build_windows == 'true' || github.event.inputs.build_linux_arm64 == 'true' }}
+    name: Build CLI ${{ matrix.platform }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    needs: resolve_source
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            arch: amd64
+            os: windows-latest
+            goos: windows
+            goarch: amd64
+            binary: sing-box.exe
+            enabled: ${{ github.event.inputs.build_windows == 'true' }}
+          - platform: linux
+            arch: arm64
+            os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            binary: sing-box
+            enabled: ${{ github.event.inputs.build_linux_arm64 == 'true' }}
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Checkout sing-box
+        uses: actions/checkout@v6
+        with:
+          repository: Joelincn/sing-box
+          ref: ${{ needs.resolve_source.outputs.source_sha }}
+          path: sing-box
+          fetch-depth: 1
+
+      - name: Set build tag
+        shell: bash
+        run: git -C sing-box tag -f "v${{ github.event.inputs.version }}" "${{ needs.resolve_source.outputs.source_sha }}"
+
+      - name: Cache Go modules
+        uses: actions/cache@v5
+        with:
+          path: ~/go/pkg/mod
+          key: go-mod-${{ matrix.platform }}-${{ hashFiles('sing-box/go.sum') }}
+          restore-keys: go-mod-${{ matrix.platform }}-
+
+      - name: Compute build environment
+        id: env
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ matrix.platform }}" == "windows" ]]; then
+            TAGS=$(cat sing-box/release/DEFAULT_BUILD_TAGS_WINDOWS)
+          elif [[ "${{ matrix.arch }}" == "arm64" ]]; then
+            TAGS=$(cat sing-box/release/DEFAULT_BUILD_TAGS_OTHERS)
+          else
+            TAGS=$(cat sing-box/release/DEFAULT_BUILD_TAGS)
+          fi
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+          echo "ldflags=$(cat sing-box/release/LDFLAGS)" >> "$GITHUB_OUTPUT"
+          echo "--- Build Environment ---"
+          echo "Platform: ${{ matrix.platform }}"
+          echo "Arch: ${{ matrix.arch }}"
+          echo "Tags: ${TAGS}"
+
+      - name: Build
+        shell: bash
+        run: |
+          set -xeuo pipefail
+          cd sing-box
+          mkdir -p dist
+          go build -v -trimpath -o "dist/${{ matrix.binary }}" \
+            -tags "${{ steps.env.outputs.tags }}" \
+            -ldflags "-X github.com/sagernet/sing-box/constant.Version=${{ github.event.inputs.version }} ${{ steps.env.outputs.ldflags }} -s -w -buildid=" \
+            ./cmd/sing-box
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+
+      - name: Archive (Linux)
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          cd sing-box/dist
+          DIR_NAME="sing-box-${{ github.event.inputs.version }}-linux-${{ matrix.arch }}"
+          mkdir -p "$DIR_NAME"
+          cp ../LICENSE "$DIR_NAME/"
+          cp sing-box "$DIR_NAME/"
+          tar -czvf "$DIR_NAME.tar.gz" "$DIR_NAME"
+          rm -rf "$DIR_NAME" sing-box
+
+      - name: Archive (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          cd sing-box/dist
+          $DIR_NAME = "sing-box-${{ github.event.inputs.version }}-windows-${{ matrix.arch }}"
+          mkdir "$DIR_NAME"
+          Copy-Item ../LICENSE "$DIR_NAME/"
+          Copy-Item sing-box.exe "$DIR_NAME/"
+          Compress-Archive -Path "$DIR_NAME" -DestinationPath "$DIR_NAME.zip"
+          Remove-Item -Recurse "$DIR_NAME"
+          Remove-Item sing-box.exe
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: binary-${{ matrix.platform }}-${{ matrix.arch }}
+          path: sing-box/dist/*
+          retention-days: 7
+
+  build_android_library:
+    if: ${{ github.event.inputs.build_android == 'true' }}
+    name: Build Android library (arm64)
+    runs-on: ubuntu-latest
+    needs: resolve_source
+    steps:
+      - name: Checkout sing-box
+        uses: actions/checkout@v6
+        with:
+          repository: Joelincn/sing-box
+          ref: ${{ needs.resolve_source.outputs.source_sha }}
+          path: sing-box
+          fetch-depth: 1
+
+      - name: Set build tag
+        run: git -C sing-box tag -f "v${{ github.event.inputs.version }}" "${{ needs.resolve_source.outputs.source_sha }}"
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Cache Go modules
+        uses: actions/cache@v5
+        with:
+          path: ~/go/pkg/mod
+          key: go-mod-android-${{ hashFiles('sing-box/go.sum') }}
+          restore-keys: go-mod-android-
+
+      - name: Setup Android NDK
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r28
+
+      - name: Setup OpenJDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Build library
+        run: |
+          set -euo pipefail
+          cd sing-box
+          make lib_install
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          go run ./cmd/internal/build_libbox -target android -platform android/arm64
+          mkdir -p dist/arm64
+          cp libbox.aar libbox-legacy.aar "dist/arm64/"
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+
+      - name: Upload library
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-library-arm64
+          path: sing-box/dist
+          compression-level: 0
+
+  build_android:
+    if: ${{ github.event.inputs.build_android == 'true' }}
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    needs: [resolve_source, build_android_library]
+    steps:
+      - name: Checkout sing-box
+        uses: actions/checkout@v6
+        with:
+          repository: Joelincn/sing-box
+          ref: ${{ needs.resolve_source.outputs.source_sha }}
+          path: sing-box
+          fetch-depth: 1
+
+      - name: Set build tag
+        run: git -C sing-box tag -f "v${{ github.event.inputs.version }}" "${{ needs.resolve_source.outputs.source_sha }}"
+
+      - name: Checkout sing-box-for-android
+        uses: actions/checkout@v6
+        with:
+          repository: SagerNet/sing-box-for-android
+          ref: main
+          path: sing-box-for-android
+
+      - name: Checkout submodule recursive
+        run: git -C sing-box-for-android submodule update --init --recursive -v
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Restore Go modules
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/go/pkg/mod
+          key: go-mod-android-${{ hashFiles('sing-box/go.sum') }}
+          restore-keys: go-mod-android-
+
+      - name: Cache Go tool builds
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/go-build
+          key: go-build-tools-android-${{ hashFiles('sing-box/go.sum') }}
+          restore-keys: go-build-tools-android-
+
+      - name: Setup Android NDK
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r28
+
+      - name: Setup OpenJDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Read version code from source
+        run: |
+          set -euo pipefail
+          if [ -f "sing-box-for-android/version.properties" ]; then
+            version_code=$(grep '^VERSION_CODE=' sing-box-for-android/version.properties | cut -d'=' -f2)
+            echo "VERSION_CODE=${version_code}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION_CODE=1" >> "$GITHUB_ENV"
+          fi
+
+      - name: Download libraries
+        uses: actions/download-artifact@v8
+        with:
+          pattern: android-library-*
+          path: libbox-inputs
+          merge-multiple: true
+
+      - name: Copy libraries to Android project
+        run: |
+          set -euo pipefail
+          mkdir -p sing-box-for-android/app/libs
+          # Copy arm64 library
+          cp libbox-inputs/arm64/libbox.aar sing-box-for-android/app/libs/
+          cp libbox-inputs/arm64/libbox-legacy.aar sing-box-for-android/app/libs/
+
+      - name: Decode Keystore
+        run: echo "${{ secrets.RELEASE_KEYSTORE_FILE }}" | base64 -d > sing-box-for-android/app/release.keystore
+
+      - name: Build APK
+        run: |
+          cd sing-box-for-android
+          chmod +x gradlew
+          ./gradlew --build-cache --parallel :app:assembleOtherRelease \
+            -Pandroid.injected.signing.store.file=$(pwd)/app/release.keystore \
+            -Pandroid.injected.signing.store.password="${{ secrets.RELEASE_KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.RELEASE_KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.RELEASE_KEY_PASSWORD }}"
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+
+      - name: Prepare upload
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find sing-box-for-android/app/build/outputs/apk -name "*.apk" -exec cp {} dist/ \;
+          # Rename APK files to include Mustang suffix
+          VERSION="${{ github.event.inputs.version }}"
+          BASE_VERSION="${VERSION%%-*}"
+          for apk in dist/SFA-*.apk; do
+            if [ -f "$apk" ]; then
+              new_name=$(echo "$apk" | sed "s/SFA-${BASE_VERSION}-/SFA-${VERSION}-/")
+              mv "$apk" "$new_name"
+              echo "Renamed: $(basename "$apk") -> $(basename "$new_name")"
+            fi
+          done
+          printf '{\n    "version_code": %s,\n    "version_name": "%s"\n}\n' \
+            "$VERSION_CODE" "$VERSION" > dist/SFA-version-metadata.json
+          cat dist/SFA-version-metadata.json
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-apk
+          path: dist
+
+  publish:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    needs: [resolve_source, build_cli, build_android_library, build_android]
+    if: always() && !failure()
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate release notes
+        env:
+          VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ needs.resolve_source.outputs.source_sha }}
+          BUILT_AT: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          published_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          {
+            echo "## 🐎 Mustang Build v${VERSION}"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Version | \`v${VERSION}\` (Mustang Build) |"
+            echo "| Source Commit | [\`${SOURCE_SHA}\`](https://github.com/Joelincn/sing-box/commit/${SOURCE_SHA}) |"
+            echo "| Built At | ${published_at} |"
+            echo "| Build Run ID | [${BUILT_AT}](https://github.com/${{ github.repository }}/actions/runs/${BUILT_AT}) |"
+            echo ""
+            echo "### Included Platforms"
+            echo "- Windows amd64"
+            echo "- Linux arm64"
+            echo "- Android SFA (arm64-v8a)"
+            echo ""
+            echo "### Build Tags"
+            echo "Uses official build tags from \`release/DEFAULT_BUILD_TAGS\` and \`release/DEFAULT_BUILD_TAGS_WINDOWS\`"
+            echo ""
+            echo "### 🐎 About Mustang Build"
+            echo "This is a custom build of sing-box with DNS round-robin group strategy support."
+          } > release-notes.md
+
+      - name: List artifacts
+        run: |
+          echo "=== Artifacts ==="
+          find artifacts -type f -ls
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: v${{ inputs.version }}
+          prerelease: false
+          body_path: release-notes.md
+          files: artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
