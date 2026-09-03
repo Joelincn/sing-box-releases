@@ -1,4 +1,4 @@
-name: Build sing-box for daily use
+name: Build sing-box
 
 on:
   workflow_dispatch:
