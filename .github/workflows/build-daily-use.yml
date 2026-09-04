@@ -268,6 +268,14 @@ jobs:
       - name: Checkout submodule recursive
         run: git -C sing-box-for-android submodule update --init --recursive -v
 
+      - name: Rebrand to Mustang (package + update URL)
+        run: |
+          set -euo pipefail
+          sed -i 's|applicationId = "io.reF1nd.sfa"|applicationId = "io.mustang.sfa"|' sing-box-for-android/app/build.gradle.kts
+          sed -i 's|https://api.github.com/repos/reF1nd/sing-box-releases/releases|https://api.github.com/repos/Joelincn/sing-box-releases/releases|' sing-box-for-android/app/src/github/java/io/nekohasekai/sfa/vendor/GitHubUpdateChecker.kt
+          grep -n 'applicationId' sing-box-for-android/app/build.gradle.kts
+          grep -n 'RELEASES_URL' sing-box-for-android/app/src/github/java/io/nekohasekai/sfa/vendor/GitHubUpdateChecker.kt
+
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
