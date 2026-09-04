@@ -279,6 +279,8 @@ jobs:
           sed -i 's|applicationId = "io.reF1nd.sfa"|applicationId = "io.mustang.sfa"|' sing-box-for-android/app/build.gradle.kts
           sed -i 's|https://api.github.com/repos/reF1nd/sing-box-releases/releases|https://api.github.com/repos/Joelincn/sing-box-releases/releases|' sing-box-for-android/app/src/github/java/io/nekohasekai/sfa/vendor/GitHubUpdateChecker.kt
           sed -i "s|^VERSION_NAME=.*|VERSION_NAME=${{ github.event.inputs.version }}|" sing-box-for-android/version.properties
+          BASE_CODE=$(grep '^VERSION_CODE=' sing-box-for-android/version.properties | cut -d'=' -f2)
+          sed -i "s|^VERSION_CODE=.*|VERSION_CODE=$((BASE_CODE + GITHUB_RUN_NUMBER))|" sing-box-for-android/version.properties
           grep -n 'applicationId' sing-box-for-android/app/build.gradle.kts
           grep -n 'RELEASES_URL' sing-box-for-android/app/src/github/java/io/nekohasekai/sfa/vendor/GitHubUpdateChecker.kt
           grep -n '^VERSION_' sing-box-for-android/version.properties
