@@ -56,6 +56,14 @@ jobs:
       - name: Set build tag
         run: git -C sing-box tag -f "v${{ github.event.inputs.version }}" "$(git -C sing-box rev-parse HEAD)"
 
+      - name: Assert Mustang features present
+        run: |
+          set -euo pipefail
+          grep -q 'StrategyRoundRobin' sing-box/dns/transport/group.go || { echo "missing DNS round_robin"; exit 1; }
+          grep -q 'excludeWindow' sing-box/dns/transport/group.go || { echo "missing DNS exclude_threshold"; exit 1; }
+          grep -q 'excludeWindow' sing-box/protocol/group/loadbalance.go || { echo "missing LB exclude_threshold"; exit 1; }
+          echo "Mustang features OK"
+
       - name: Resolve source commit
         id: source
         run: |
