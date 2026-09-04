@@ -261,8 +261,8 @@ jobs:
       - name: Checkout sing-box-for-android
         uses: actions/checkout@v6
         with:
-          repository: SagerNet/sing-box-for-android
-          ref: main
+          repository: reF1nd/sing-box-for-android
+          ref: reF1nd-stable
           path: sing-box-for-android
 
       - name: Checkout submodule recursive
