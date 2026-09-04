@@ -5,6 +5,7 @@
 ## 特性
 
 - **DNS 轮询策略**：支持在 DNS 组中使用 `round_robin` 策略，另有组内服务商 15 分钟熔断剔除（`exclude_threshold`）
+- **出站负载均衡熔断**：`loadbalance` 组 15 分钟熔断剔除（`exclude_threshold`），三种策略通用
 - **多平台支持**：Windows amd64、Linux arm64、Android SFA
 - **自动化构建**：通过 GitHub Actions 自动构建和发布
 - **自定义签名**：使用固定的 release keystore 进行 APK 签名
@@ -78,6 +79,29 @@ gh workflow run build-daily-use.yml \
 - 组内某服务商 15 分钟窗口内失败满 N 次即剔除，不再参与查询
 - 每 15 分钟窗口轮转，计数与剔除自动清零恢复
 - 全被剔除时 fail-open：仍用全量列表，保证不断服
+- 不填或填 0 即关闭（默认关闭）
+
+## 出站负载均衡熔断剔除
+
+`loadbalance` 出站新增 `exclude_threshold`（与 DNS 组熔断同系列）：
+
+```json
+{
+  "outbounds": [
+    {
+      "type": "loadbalance",
+      "tag": "lb-out",
+      "outbounds": ["proxy-a", "proxy-b", "proxy-c"],
+      "strategy": "round-robin",
+      "exclude_threshold": 5
+    }
+  ]
+}
+```
+
+- 三种策略通用：`round-robin`、`consistent-hashing`、`sticky-sessions`
+- 某节点 15 分钟窗口内真实拨号失败满 N 次即暂时剔除，窗口轮转自动恢复
+- 只计真实业务失败：调用方主动取消不计，URL 测试失败只影响可用性判定、不计入
 - 不填或填 0 即关闭（默认关闭）
 
 ## 版本号说明
