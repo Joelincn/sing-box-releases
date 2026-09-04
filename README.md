@@ -4,7 +4,7 @@
 
 ## 特性
 
-- **DNS 轮询策略**：支持在 DNS 组中使用 `round_robin` 策略
+- **DNS 轮询策略**：支持在 DNS 组中使用 `round_robin` 策略，另有组内服务商 15 分钟熔断剔除（`exclude_threshold`）
 - **多平台支持**：Windows amd64、Linux arm64、Android SFA
 - **自动化构建**：通过 GitHub Actions 自动构建和发布
 - **自定义签名**：使用固定的 release keystore 进行 APK 签名
@@ -15,7 +15,7 @@
 |------|------|----------|
 | Windows | amd64 | `sing-box-{version}-windows-amd64.zip` |
 | Linux | arm64 | `sing-box-{version}-linux-arm64.tar.gz` |
-| Android | arm64-v8a | `SFA-{version}-arm64-v8a.apk` |
+| Android | arm64-v8a | `SFA-{version}-arm64-v8a.apk`、`SFA-{version}-universal.apk` |
 
 ## 如何构建
 
@@ -62,7 +62,8 @@ gh workflow run build-daily-use.yml \
         "type": "group",
         "tag": "dns-group",
         "strategy": "round_robin",
-        "servers": ["dns-a", "dns-b", "dns-c"]
+        "servers": ["dns-a", "dns-b", "dns-c"],
+        "exclude_threshold": 3
       }
     ]
   }
@@ -71,7 +72,13 @@ gh workflow run build-daily-use.yml \
 
 **两种策略可用**：
 - `concurrent`（默认）：并发查询所有服务器，返回最快响应
-- `round_robin`：按轮询顺序查询服务器，支持自动故障转移
+- `round_robin`：按轮询顺序只查一台服务器（无 fallback），N 个并发均摊到 N 台，适合有配额限制的服务商
+
+**组内熔断剔除**（`exclude_threshold`，两种策略通用）：
+- 组内某服务商 15 分钟窗口内失败满 N 次即剔除，不再参与查询
+- 每 15 分钟窗口轮转，计数与剔除自动清零恢复
+- 全被剔除时 fail-open：仍用全量列表，保证不断服
+- 不填或填 0 即关闭（默认关闭）
 
 ## 版本号说明
 

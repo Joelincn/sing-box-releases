@@ -381,6 +381,9 @@ jobs:
           printf '{\n    "version_code": %s,\n    "version_name": "%s"\n}\n' \
             "$VERSION_CODE" "$VERSION" > dist/SFA-version-metadata.json
           cat dist/SFA-version-metadata.json
+          # Only ship arm64-v8a + universal, drop other-ABI shells (no native .so built)
+          find dist -name 'SFA-*.apk' ! -name '*arm64-v8a.apk' ! -name '*universal.apk' -delete
+          echo "=== Final dist ===" && ls -la dist
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -401,6 +404,12 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+
+      - name: Drop dev-only files from release
+        run: |
+          set -euo pipefail
+          # libbox aars are already baked into the APKs; keep release user-facing
+          find artifacts -name '*.aar' -delete
 
       - name: Generate release notes
         env:
