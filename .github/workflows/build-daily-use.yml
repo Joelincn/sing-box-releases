@@ -372,7 +372,9 @@ jobs:
               if [[ "$(basename "$new_name")" != *"${VERSION}"* ]]; then
                 new_name=$(echo "$new_name" | sed "s/SFA-${BASE_VERSION}-/SFA-${VERSION}-/")
               fi
-              mv "$apk" "$new_name"
+              if [[ "$apk" != "$new_name" ]]; then
+                mv "$apk" "$new_name"
+              fi
               echo "Renamed: $(basename "$apk") -> $(basename "$new_name")"
             fi
           done
