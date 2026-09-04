@@ -25,6 +25,11 @@ on:
         required: false
         type: boolean
         default: true
+      publish_release:
+        description: 'Publish GitHub Release (false = artifacts only for self-test)'
+        required: false
+        type: boolean
+        default: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.version }}
@@ -268,13 +273,15 @@ jobs:
       - name: Checkout submodule recursive
         run: git -C sing-box-for-android submodule update --init --recursive -v
 
-      - name: Rebrand to Mustang (package + update URL)
+      - name: Rebrand to Mustang (package + update URL + version)
         run: |
           set -euo pipefail
           sed -i 's|applicationId = "io.reF1nd.sfa"|applicationId = "io.mustang.sfa"|' sing-box-for-android/app/build.gradle.kts
           sed -i 's|https://api.github.com/repos/reF1nd/sing-box-releases/releases|https://api.github.com/repos/Joelincn/sing-box-releases/releases|' sing-box-for-android/app/src/github/java/io/nekohasekai/sfa/vendor/GitHubUpdateChecker.kt
+          sed -i "s|^VERSION_NAME=.*|VERSION_NAME=${{ github.event.inputs.version }}|" sing-box-for-android/version.properties
           grep -n 'applicationId' sing-box-for-android/app/build.gradle.kts
           grep -n 'RELEASES_URL' sing-box-for-android/app/src/github/java/io/nekohasekai/sfa/vendor/GitHubUpdateChecker.kt
+          grep -n '^VERSION_' sing-box-for-android/version.properties
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -356,12 +363,15 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           find sing-box-for-android/app/build/outputs/apk -name "*.apk" -exec cp {} dist/ \;
-          # Rename APK files to include Mustang suffix
+          # Rename APK files to include Mustang suffix, strip upstream -reF1nd infix
           VERSION="${{ github.event.inputs.version }}"
           BASE_VERSION="${VERSION%%-*}"
           for apk in dist/SFA-*.apk; do
             if [ -f "$apk" ]; then
-              new_name=$(echo "$apk" | sed "s/SFA-${BASE_VERSION}-/SFA-${VERSION}-/")
+              new_name=$(echo "$apk" | sed "s/-reF1nd//g")
+              if [[ "$(basename "$new_name")" != *"${VERSION}"* ]]; then
+                new_name=$(echo "$new_name" | sed "s/SFA-${BASE_VERSION}-/SFA-${VERSION}-/")
+              fi
               mv "$apk" "$new_name"
               echo "Renamed: $(basename "$apk") -> $(basename "$new_name")"
             fi
@@ -380,7 +390,7 @@ jobs:
     name: Publish Release
     runs-on: ubuntu-latest
     needs: [resolve_source, build_cli, build_android_library, build_android]
-    if: always() && !failure()
+    if: always() && !failure() && github.event.inputs.publish_release == 'true'
     permissions:
       contents: write
     steps:
