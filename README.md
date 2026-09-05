@@ -109,6 +109,34 @@ gh workflow run build-daily-use.yml \
 - `interrupt_exclude` 豁免命中连接不断开：条目内多条件 AND、条目间 OR，条件含 `domain_suffix` / `package_name`（仅 Android）/ `process_name` / `process_path`（仅桌面）/ `port` / `rule_set`
 - 注意：条目至少写一个条件（空条目会被解析器静默丢弃）；`rule_set` 写错 tag 启动报错；豁免只保不断开，被剔节点照样不接新连；域名条件要求域名可见
 
+典型配置：
+
+```json
+{
+  "outbounds": [
+    {
+      "type": "loadbalance",
+      "tag": "lb-out",
+      "outbounds": ["proxy-a", "proxy-b", "proxy-c"],
+      "strategy": "round-robin",
+      "exclude_threshold": 5,
+      "interrupt_exist_connections": true,
+      "interrupt_exclude": [
+        {
+          "domain_suffix": ["bank.com"],
+          "package_name": ["com.example.bank"]
+        },
+        {
+          "port": [22]
+        }
+      ]
+    }
+  ]
+}
+```
+
+说明：银行类 App 不掐线、SSH 22 端口不掐线；条目内条件 AND、条目间 OR；`package_name` 仅 Android，`process_name`/`process_path` 仅桌面
+
 ## 版本号说明
 
 版本号格式：`{主版本}-Mustang.{修订号}`
