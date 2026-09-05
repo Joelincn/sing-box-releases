@@ -104,6 +104,11 @@ gh workflow run build-daily-use.yml \
 - 只计真实业务失败：调用方主动取消不计，URL 测试失败只影响可用性判定、不计入
 - 不填或填 0 即关闭（默认关闭）
 
+**剔除联动掐线**（`interrupt_exist_connections`＋`interrupt_exclude`）：
+- 节点被熔断剔除时，可选同时掐断它的已有连接（默认只跳过新连接）
+- `interrupt_exclude` 豁免命中连接不断开：条目内多条件 AND、条目间 OR，条件含 `domain_suffix` / `package_name`（仅 Android）/ `process_name` / `process_path`（仅桌面）/ `port` / `rule_set`
+- 注意：条目至少写一个条件（空条目会被解析器静默丢弃）；`rule_set` 写错 tag 启动报错；豁免只保不断开，被剔节点照样不接新连；域名条件要求域名可见
+
 ## 版本号说明
 
 版本号格式：`{主版本}-Mustang.{修订号}`

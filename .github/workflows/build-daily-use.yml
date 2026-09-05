@@ -62,6 +62,8 @@ jobs:
           grep -q 'StrategyRoundRobin' sing-box/dns/transport/group.go || { echo "missing DNS round_robin"; exit 1; }
           grep -q 'excludeWindow' sing-box/dns/transport/group.go || { echo "missing DNS exclude_threshold"; exit 1; }
           grep -q 'excludeWindow' sing-box/protocol/group/loadbalance.go || { echo "missing LB exclude_threshold"; exit 1; }
+          test -f sing-box/protocol/group/lb_interrupt_exclude.go || { echo "missing LB interrupt_exclude"; exit 1; }
+          grep -q 'InterruptExistConnections' sing-box/option/group.go || { echo "missing LB interrupt_exist_connections"; exit 1; }
           echo "Mustang features OK"
 
       - name: Resolve source commit
