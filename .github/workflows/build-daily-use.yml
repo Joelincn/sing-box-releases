@@ -30,6 +30,10 @@ on:
         required: false
         type: boolean
         default: true
+      shell_ref:
+        description: 'sing-box-for-android branch (match kernel major version)'
+        required: false
+        default: 'reF1nd-testing'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.version }}
@@ -277,7 +281,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: reF1nd/sing-box-for-android
-          ref: reF1nd-stable
+          ref: ${{ inputs.shell_ref }}
           path: sing-box-for-android
 
       - name: Checkout submodule recursive
