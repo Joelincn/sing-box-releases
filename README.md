@@ -6,6 +6,7 @@
 
 - **DNS 轮询策略**：支持在 DNS 组中使用 `round_robin` 策略，另有组内服务商 15 分钟熔断剔除（`exclude_threshold`）
 - **出站负载均衡熔断**：`loadbalance` 组 15 分钟熔断剔除（`exclude_threshold`），三种策略通用
+- **支持Mieru 协议出站**
 - **多平台支持**：Windows amd64、Linux arm64、Android SFA
 - **自动化构建**：通过 GitHub Actions 自动构建和发布
 - **自定义签名**：使用固定的 release keystore 进行 APK 签名
