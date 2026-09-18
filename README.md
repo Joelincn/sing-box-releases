@@ -137,6 +137,27 @@ gh workflow run build-daily-use.yml \
 
 说明：银行类 App 不掐线、SSH 22 端口不掐线；条目内条件 AND、条目间 OR；`package_name` 仅 Android，`process_name`/`process_path` 仅桌面
 
+## Mieru 出站
+
+支持 `mieru` 协议出站（用户名/密码认证，多路复用与流量伪装可配）：
+
+```json
+{
+  "outbounds": [
+    {
+      "type": "mieru",
+      "tag": "mieru-out",
+      "server": "example.com",
+      "server_port": 443,
+      "username": "user",
+      "password": "pass",
+      "transport": "tcp",
+      "multiplexing": "multiplex"
+    }
+  ]
+}
+```
+
 ## 版本号说明
 
 版本号格式：`{主版本}-Mustang.{修订号}`
