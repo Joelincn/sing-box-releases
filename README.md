@@ -1,6 +1,7 @@
 # 🐎 sing-box Mustang
 
 基于 [reF1nd/sing-box](https://github.com/reF1nd/sing-box) 的自定义构建，支持 DNS 轮询策略。
+
 （上游文档： https://github.com/reF1nd/sing-box/tree/reF1nd-testing-next/docs/configuration ）
 
 ## 特性
@@ -101,7 +102,8 @@ gh workflow run build-daily-use.yml \
 }
 ```
 
-- 三种策略通用：`round-robin`、`consistent-hashing`、`sticky-sessions`  （基础用法看: https://github.com/reF1nd/sing-box/blob/reF1nd-testing-next/docs/configuration/outbound/loadbalance.zh.md )
+- 三种策略通用：`round-robin`、`consistent-hashing`、`sticky-sessions`
+  （基础用法看: https://github.com/reF1nd/sing-box/blob/reF1nd-testing-next/docs/configuration/outbound/loadbalance.zh.md )
 - 某节点 15 分钟窗口内真实拨号失败满 N 次即暂时剔除，窗口轮转自动恢复
 - 只计真实业务失败：调用方主动取消不计，URL 测试失败只影响可用性判定、不计入
 - 不填或填 0 即关闭（默认关闭）
