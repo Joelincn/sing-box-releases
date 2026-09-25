@@ -17,42 +17,11 @@
 
 | 平台 | 架构 | 输出文件 |
 |------|------|----------|
-| Windows | amd64 | `sing-box-{version}-windows-amd64.zip` |
+| Windows | amd64 | `sing-box-{version}-windows-amd64.zip` |  (建议配合Gui For Singbox使用）
 | Linux | arm64 | `sing-box-{version}-linux-arm64.tar.gz` |
 | Android | arm64-v8a | `SFA-{version}-arm64-v8a.apk`、`SFA-{version}-universal.apk` |
 
-## 如何构建
-
-### 方法 1：GitHub Web UI
-
-1. 前往 [Actions](https://github.com/Joelincn/sing-box-releases/actions)
-2. 选择 "Build sing-box for daily use"
-3. 点击 "Run workflow"
-4. 填写参数：
-   - **version**: 例如 `1.14.0-Mustang.1`
-   - **commit_hash**: （可选）指定 commit hash
-   - **build_windows**: 构建 Windows amd64（默认: true）
-   - **build_linux_arm64**: 构建 Linux arm64（默认: true）
-   - **build_android**: 构建 Android SFA（默认: true）
-
-### 方法 2：GitHub CLI
-
-```bash
-gh workflow run build-daily-use.yml \
-  --repo Joelincn/sing-box-releases \
-  -f version=1.14.0-Mustang.1 \
-  -f build_windows=true \
-  -f build_linux_arm64=true \
-  -f build_android=true
-```
-
-## 构建环境
-
-- **Go 版本**: 1.26.7
-- **Build Tags**: 使用官方标签 `release/DEFAULT_BUILD_TAGS` 和 `release/DEFAULT_BUILD_TAGS_WINDOWS`
-- **Android NDK**: r28
-- **Java**: 17 (Temurin)
-- **Gradle**: 使用 Gradle cache 加速构建
+Gui For Singbox项目地址 ：https://github.com/GUI-for-Cores/GUI.for.SingBox
 
 ## DNS 轮询策略
 
@@ -172,13 +141,6 @@ gh workflow run build-daily-use.yml \
 
 示例：`1.14.0-Mustang.1`
 
-## 同步上游
-
-```bash
-git remote add upstream https://github.com/reF1nd/sing-box.git
-git fetch upstream
-git merge upstream/main
-```
 
 ## 相关仓库
 
