@@ -17,11 +17,11 @@
 
 | 平台 | 架构 | 输出文件 |
 |------|------|----------|
-| Windows | amd64 | `sing-box-{version}-windows-amd64.zip` |  (建议配合Gui For Singbox使用）
+| Windows | amd64 | `sing-box-{version}-windows-amd64.zip` |  
 | Linux | arm64 | `sing-box-{version}-linux-arm64.tar.gz` |
 | Android | arm64-v8a | `SFA-{version}-arm64-v8a.apk`、`SFA-{version}-universal.apk` |
 
-Gui For Singbox项目地址 ：https://github.com/GUI-for-Cores/GUI.for.SingBox
+( Windows建议配合Gui For Singbox使用，Gui For Singbox项目地址 ：https://github.com/GUI-for-Cores/GUI.for.SingBox )
 
 ## DNS 轮询策略
 
