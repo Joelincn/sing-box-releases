@@ -97,7 +97,7 @@ jobs:
 
   build_cli:
     if: ${{ github.event.inputs.build_windows == 'true' || github.event.inputs.build_linux_arm64 == 'true' || github.event.inputs.build_linux_amd64 == 'true' || github.event.inputs.build_linux_musl == 'true' }}
-    name: Build CLI ${{ matrix.platform }}-${{ matrix.arch }}
+    name: Build CLI ${{ matrix.platform }}-${{ matrix.arch }}-${{ matrix.libc }}
     runs-on: ${{ matrix.os }}
     needs: resolve_source
     strategy:
