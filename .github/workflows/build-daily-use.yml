@@ -105,6 +105,7 @@ jobs:
             goos: windows
             goarch: amd64
             binary: sing-box.exe
+            cgo: "0"
             enabled: ${{ github.event.inputs.build_windows == 'true' }}
           - platform: linux
             arch: arm64
@@ -112,6 +113,7 @@ jobs:
             goos: linux
             goarch: arm64
             binary: sing-box
+            cgo: "1"
             enabled: ${{ github.event.inputs.build_linux_arm64 == 'true' }}
           - platform: linux
             arch: amd64
@@ -119,6 +121,7 @@ jobs:
             goos: linux
             goarch: amd64
             binary: sing-box
+            cgo: "1"
             enabled: ${{ github.event.inputs.build_linux_amd64 == 'true' }}
     steps:
       - name: Setup Go
@@ -146,6 +149,27 @@ jobs:
           key: go-mod-${{ matrix.platform }}-${{ hashFiles('sing-box/go.sum') }}
           restore-keys: go-mod-${{ matrix.platform }}-
 
+      - name: Setup Clang toolchain (Linux with naive)
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -xeuo pipefail
+          # naiveproxy links prebuilt libcronet.a, which requires clang+lld
+          # (system gcc/GNU ld reports "skipping incompatible")
+          sudo apt-get update
+          if [[ "${{ matrix.arch }}" == "arm64" ]]; then
+            sudo apt-get install -y clang lld gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+            echo "CC=clang" >> "$GITHUB_ENV"
+            echo "CXX=clang++" >> "$GITHUB_ENV"
+            echo "CGO_CFLAGS=--target=aarch64-linux-gnu --sysroot=/usr/aarch64-linux-gnu" >> "$GITHUB_ENV"
+            echo "CGO_LDFLAGS=--target=aarch64-linux-gnu --sysroot=/usr/aarch64-linux-gnu -fuse-ld=lld" >> "$GITHUB_ENV"
+          else
+            sudo apt-get install -y clang lld
+            echo "CC=clang" >> "$GITHUB_ENV"
+            echo "CXX=clang++" >> "$GITHUB_ENV"
+            echo "CGO_LDFLAGS=-fuse-ld=lld" >> "$GITHUB_ENV"
+          fi
+
       - name: Compute build environment
         id: env
         shell: bash
@@ -153,8 +177,6 @@ jobs:
           set -euo pipefail
           if [[ "${{ matrix.platform }}" == "windows" ]]; then
             TAGS=$(cat sing-box/release/DEFAULT_BUILD_TAGS_WINDOWS)
-          elif [[ "${{ matrix.platform }}" == "linux" ]]; then
-            TAGS=$(cat sing-box/release/DEFAULT_BUILD_TAGS_OTHERS)
           else
             TAGS=$(cat sing-box/release/DEFAULT_BUILD_TAGS)
           fi
@@ -163,6 +185,7 @@ jobs:
           echo "--- Build Environment ---"
           echo "Platform: ${{ matrix.platform }}"
           echo "Arch: ${{ matrix.arch }}"
+          echo "CGO: ${{ matrix.cgo }}"
           echo "Tags: ${TAGS}"
 
       - name: Build
@@ -176,7 +199,7 @@ jobs:
             -ldflags "-X github.com/sagernet/sing-box/constant.Version=${{ github.event.inputs.version }} ${{ steps.env.outputs.ldflags }} -s -w -buildid=" \
             ./cmd/sing-box
         env:
-          CGO_ENABLED: "0"
+          CGO_ENABLED: ${{ matrix.cgo }}
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
 
