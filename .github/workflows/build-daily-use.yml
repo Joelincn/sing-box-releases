@@ -100,6 +100,7 @@ jobs:
     name: Build CLI ${{ matrix.platform }}-${{ matrix.arch }}-${{ matrix.libc }}
     runs-on: ${{ matrix.os }}
     needs: resolve_source
+    if: ${{ matrix.enabled }}
     strategy:
       fail-fast: false
       matrix:
@@ -188,7 +189,12 @@ jobs:
             echo "CC=clang" >> "$GITHUB_ENV"
             echo "CXX=clang++" >> "$GITHUB_ENV"
             echo "CGO_CFLAGS=--target=aarch64-linux-gnu --sysroot=/usr/aarch64-linux-gnu" >> "$GITHUB_ENV"
-            echo "CGO_LDFLAGS=--target=aarch64-linux-gnu --sysroot=/usr/aarch64-linux-gnu -fuse-ld=lld" >> "$GITHUB_ENV"
+            # NOTE: keep --sysroot out of CGO_LDFLAGS. Debian's cross
+            # libm.so linker script uses absolute GROUP() paths; lld
+            # re-roots them inside the sysroot and fails with
+            # "cannot find ... inside /usr/aarch64-linux-gnu".
+            # clang resolves the multiarch lib path by target triple alone.
+            echo "CGO_LDFLAGS=--target=aarch64-linux-gnu -fuse-ld=lld" >> "$GITHUB_ENV"
           else
             sudo apt-get install -y clang lld
             echo "CC=clang" >> "$GITHUB_ENV"
