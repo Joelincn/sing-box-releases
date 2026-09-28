@@ -25,6 +25,11 @@ on:
         required: false
         type: boolean
         default: true
+      build_linux_musl:
+        description: 'Build Linux musl variants (amd64+arm64, with naive)'
+        required: false
+        type: boolean
+        default: true
       build_android:
         description: 'Build Android SFA (arm64)'
         required: false
@@ -91,7 +96,7 @@ jobs:
           INPUT_VERSION: ${{ inputs.version }}
 
   build_cli:
-    if: ${{ github.event.inputs.build_windows == 'true' || github.event.inputs.build_linux_arm64 == 'true' || github.event.inputs.build_linux_amd64 == 'true' }}
+    if: ${{ github.event.inputs.build_windows == 'true' || github.event.inputs.build_linux_arm64 == 'true' || github.event.inputs.build_linux_amd64 == 'true' || github.event.inputs.build_linux_musl == 'true' }}
     name: Build CLI ${{ matrix.platform }}-${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     needs: resolve_source
@@ -106,6 +111,7 @@ jobs:
             goarch: amd64
             binary: sing-box.exe
             cgo: "0"
+            libc: glibc
             enabled: ${{ github.event.inputs.build_windows == 'true' }}
           - platform: linux
             arch: arm64
@@ -114,6 +120,7 @@ jobs:
             goarch: arm64
             binary: sing-box
             cgo: "1"
+            libc: glibc
             enabled: ${{ github.event.inputs.build_linux_arm64 == 'true' }}
           - platform: linux
             arch: amd64
@@ -122,7 +129,26 @@ jobs:
             goarch: amd64
             binary: sing-box
             cgo: "1"
+            libc: glibc
             enabled: ${{ github.event.inputs.build_linux_amd64 == 'true' }}
+          - platform: linux
+            arch: arm64
+            os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            binary: sing-box
+            cgo: "1"
+            libc: musl
+            enabled: ${{ github.event.inputs.build_linux_musl == 'true' }}
+          - platform: linux
+            arch: amd64
+            os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            binary: sing-box
+            cgo: "1"
+            libc: musl
+            enabled: ${{ github.event.inputs.build_linux_musl == 'true' }}
     steps:
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -149,8 +175,8 @@ jobs:
           key: go-mod-${{ matrix.platform }}-${{ hashFiles('sing-box/go.sum') }}
           restore-keys: go-mod-${{ matrix.platform }}-
 
-      - name: Setup Clang toolchain (Linux with naive)
-        if: matrix.platform == 'linux'
+      - name: Setup Clang toolchain (Linux glibc with naive)
+        if: matrix.platform == 'linux' && matrix.libc != 'musl'
         shell: bash
         run: |
           set -xeuo pipefail
@@ -170,6 +196,27 @@ jobs:
             echo "CGO_LDFLAGS=-fuse-ld=lld" >> "$GITHUB_ENV"
           fi
 
+      - name: Setup Chromium toolchain (Linux musl with naive)
+        if: matrix.platform == 'linux' && matrix.libc == 'musl'
+        shell: bash
+        run: |
+          set -xeuo pipefail
+          # Same recipe as upstream SagerNet release builds: fetch cronet-go
+          # sources, init naiveproxy submodules, download the Chromium
+          # toolchain (clang/lld/musl sysroot) for the target arch.
+          CRONET_GO_VERSION=$(cat sing-box/.github/CRONET_GO_VERSION)
+          git init ~/cronet-go
+          git -C ~/cronet-go remote add origin https://github.com/sagernet/cronet-go.git
+          git -C ~/cronet-go sparse-checkout set --no-cone '/*' '!/lib'
+          git -C ~/cronet-go fetch --depth=1 --filter=blob:none origin "$CRONET_GO_VERSION"
+          git -C ~/cronet-go checkout FETCH_HEAD
+          git -C ~/cronet-go submodule update --init --recursive --depth=1
+          rm -f ~/cronet-go/naiveproxy/src/build/linux/sysroot_scripts/keyring.gpg
+          cd ~/cronet-go
+          GPG_TTY=/dev/null ./naiveproxy/src/build/linux/sysroot_scripts/generate_keyring.sh
+          go run ./cmd/build-naive --target=linux/${{ matrix.arch }} --libc=musl download-toolchain
+          go run ./cmd/build-naive --target=linux/${{ matrix.arch }} --libc=musl env >> "$GITHUB_ENV"
+
       - name: Compute build environment
         id: env
         shell: bash
@@ -180,11 +227,15 @@ jobs:
           else
             TAGS=$(cat sing-box/release/DEFAULT_BUILD_TAGS)
           fi
+          if [[ "${{ matrix.libc }}" == "musl" ]]; then
+            TAGS="${TAGS},with_musl"
+          fi
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
           echo "ldflags=$(cat sing-box/release/LDFLAGS)" >> "$GITHUB_OUTPUT"
           echo "--- Build Environment ---"
           echo "Platform: ${{ matrix.platform }}"
           echo "Arch: ${{ matrix.arch }}"
+          echo "Libc: ${{ matrix.libc }}"
           echo "CGO: ${{ matrix.cgo }}"
           echo "Tags: ${TAGS}"
 
@@ -208,7 +259,9 @@ jobs:
         shell: bash
         run: |
           cd sing-box/dist
-          DIR_NAME="sing-box-${{ github.event.inputs.version }}-linux-${{ matrix.arch }}"
+          SUFFIX=""
+          if [[ "${{ matrix.libc }}" == "musl" ]]; then SUFFIX="-musl"; fi
+          DIR_NAME="sing-box-${{ github.event.inputs.version }}-linux-${{ matrix.arch }}${SUFFIX}"
           mkdir -p "$DIR_NAME"
           cp ../LICENSE "$DIR_NAME/"
           cp sing-box "$DIR_NAME/"
@@ -231,7 +284,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: binary-${{ matrix.platform }}-${{ matrix.arch }}
+          name: binary-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.libc == 'musl' && '-musl' || '' }}
           path: sing-box/dist/*
           retention-days: 7
 
@@ -485,8 +538,10 @@ jobs:
             echo ""
              echo "### Included Platforms"
              echo "- Windows amd64"
-             echo "- Linux amd64"
-             echo "- Linux arm64"
+             echo "- Linux amd64 (glibc, with naive)"
+             echo "- Linux arm64 (glibc, with naive)"
+             echo "- Linux amd64-musl (static, with naive, for Alpine/OpenWrt)"
+             echo "- Linux arm64-musl (static, with naive, for Alpine/OpenWrt)"
              echo "- Android SFA (arm64-v8a)"
             echo ""
             echo "### Build Tags"
