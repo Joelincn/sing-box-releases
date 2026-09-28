@@ -3,11 +3,11 @@
   "project_name_cn": "Mustang 版本",
   "based_on": "reF1nd/sing-box",
   "version_prefix": "Mustang",
-  "description": "基于 reF1nd 的 sing-box 自定义构建，支持 DNS 轮询、DNS 组与出站负载均衡 15 分钟熔断剔除",
+  "description": "基于 reF1nd 的 sing-box 自定义构建，支持 DNS 轮询、DNS 组与出站负载均衡 15 分钟熔断剔除、剔除联动掐线与 Mieru 出站",
   "supported_platforms": [
     "Windows amd64",
     "Linux arm64",
     "Android SFA (arm64)"
   ],
-  "last_updated": "2026-09-02"
+  "last_updated": "2026-09-25"
 }
