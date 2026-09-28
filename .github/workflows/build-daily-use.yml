@@ -175,40 +175,15 @@ jobs:
           key: go-mod-${{ matrix.platform }}-${{ hashFiles('sing-box/go.sum') }}
           restore-keys: go-mod-${{ matrix.platform }}-
 
-      - name: Setup Clang toolchain (Linux glibc with naive)
-        if: matrix.platform == 'linux' && matrix.libc != 'musl'
-        shell: bash
-        run: |
-          set -xeuo pipefail
-          # naiveproxy links prebuilt libcronet.a, which requires clang+lld
-          # (system gcc/GNU ld reports "skipping incompatible")
-          sudo apt-get update
-          if [[ "${{ matrix.arch }}" == "arm64" ]]; then
-            sudo apt-get install -y clang lld gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-            echo "CC=clang" >> "$GITHUB_ENV"
-            echo "CXX=clang++" >> "$GITHUB_ENV"
-            echo "CGO_CFLAGS=--target=aarch64-linux-gnu --sysroot=/usr/aarch64-linux-gnu" >> "$GITHUB_ENV"
-            # NOTE: keep --sysroot out of CGO_LDFLAGS. Debian's cross
-            # libm.so linker script uses absolute GROUP() paths; lld
-            # re-roots them inside the sysroot and fails with
-            # "cannot find ... inside /usr/aarch64-linux-gnu".
-            # clang resolves the multiarch lib path by target triple alone.
-            echo "CGO_LDFLAGS=--target=aarch64-linux-gnu -fuse-ld=lld" >> "$GITHUB_ENV"
-          else
-            sudo apt-get install -y clang lld
-            echo "CC=clang" >> "$GITHUB_ENV"
-            echo "CXX=clang++" >> "$GITHUB_ENV"
-            echo "CGO_LDFLAGS=-fuse-ld=lld" >> "$GITHUB_ENV"
-          fi
-
-      - name: Setup Chromium toolchain (Linux musl with naive)
-        if: matrix.platform == 'linux' && matrix.libc == 'musl'
+      - name: Setup Chromium toolchain (Linux with naive)
+        if: matrix.platform == 'linux'
         shell: bash
         run: |
           set -xeuo pipefail
           # Same recipe as upstream SagerNet release builds: fetch cronet-go
           # sources, init naiveproxy submodules, download the Chromium
-          # toolchain (clang/lld/musl sysroot) for the target arch.
+          # toolchain (clang/lld/sysroot) for the target arch and libc.
+          # glibc and musl share this flow, differing only in sysroot.
           CRONET_GO_VERSION=$(cat sing-box/.github/CRONET_GO_VERSION)
           git init ~/cronet-go
           git -C ~/cronet-go remote add origin https://github.com/sagernet/cronet-go.git
@@ -219,8 +194,13 @@ jobs:
           rm -f ~/cronet-go/naiveproxy/src/build/linux/sysroot_scripts/keyring.gpg
           cd ~/cronet-go
           GPG_TTY=/dev/null ./naiveproxy/src/build/linux/sysroot_scripts/generate_keyring.sh
-          go run ./cmd/build-naive --target=linux/${{ matrix.arch }} --libc=musl download-toolchain
-          go run ./cmd/build-naive --target=linux/${{ matrix.arch }} --libc=musl env >> "$GITHUB_ENV"
+          if [[ "${{ matrix.libc }}" == "musl" ]]; then
+            go run ./cmd/build-naive --target=linux/${{ matrix.arch }} --libc=musl download-toolchain
+            go run ./cmd/build-naive --target=linux/${{ matrix.arch }} --libc=musl env >> "$GITHUB_ENV"
+          else
+            go run ./cmd/build-naive --target=linux/${{ matrix.arch }} download-toolchain
+            go run ./cmd/build-naive --target=linux/${{ matrix.arch }} env >> "$GITHUB_ENV"
+          fi
 
       - name: Compute build environment
         id: env
