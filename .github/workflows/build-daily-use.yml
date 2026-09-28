@@ -507,33 +507,12 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
           SOURCE_SHA: ${{ needs.resolve_source.outputs.source_sha }}
-          BUILT_AT: ${{ github.run_id }}
         run: |
           set -euo pipefail
-          published_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           {
             echo "## 🐎 Mustang Build v${VERSION}"
             echo ""
-            echo "| Field | Value |"
-            echo "|---|---|"
-            echo "| Version | \`v${VERSION}\` (Mustang Build) |"
-            echo "| Source Commit | [\`${SOURCE_SHA}\`](https://github.com/Joelincn/sing-box/commit/${SOURCE_SHA}) |"
-            echo "| Built At | ${published_at} |"
-            echo "| Build Run ID | [${BUILT_AT}](https://github.com/${{ github.repository }}/actions/runs/${BUILT_AT}) |"
-            echo ""
-             echo "### Included Platforms"
-             echo "- Windows amd64"
-             echo "- Linux amd64 (glibc, with naive)"
-             echo "- Linux arm64 (glibc, with naive)"
-             echo "- Linux amd64-musl (static, with naive, for Alpine/OpenWrt)"
-             echo "- Linux arm64-musl (static, with naive, for Alpine/OpenWrt)"
-             echo "- Android SFA (arm64-v8a)"
-            echo ""
-            echo "### Build Tags"
-            echo "Uses official build tags from \`release/DEFAULT_BUILD_TAGS\` and \`release/DEFAULT_BUILD_TAGS_WINDOWS\`"
-            echo ""
-            echo "### 🐎 About Mustang Build"
-            echo "This is a custom build of sing-box with DNS round-robin group strategy support."
+            echo "源码：[\`${SOURCE_SHA}\`](https://github.com/Joelincn/sing-box/commit/${SOURCE_SHA})"
           } > release-notes.md
 
       - name: List artifacts
