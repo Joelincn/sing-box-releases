@@ -9,14 +9,14 @@
 - **DNS 轮询策略**：支持在 DNS 组中使用 `round_robin` 策略，另有组内服务商 15 分钟熔断剔除（`exclude_threshold`）
 - **出站负载均衡熔断**：`loadbalance` 组 15 分钟熔断剔除（`exclude_threshold`），三种策略通用
 - **支持Mieru 协议出站**
-- **多平台支持**：Windows amd64、Linux arm64、Android SFA
+- **多平台支持**：Windows amd64、Linux arm64/amd64、Android SFA
 
 ## 支持的平台
 
 | 平台 | 架构 | 输出文件 |
 |------|------|----------|
-| Windows | amd64 | `sing-box-{version}-windows-amd64.zip` |  
-| Linux | arm64 | `sing-box-{version}-linux-arm64.tar.gz` |
+| Windows | amd64 | `sing-box-{version}-windows-amd64.zip`  |  
+| Linux | arm64/amd64 | `sing-box-{version}-linux-arm64.tar.gz`/`sing-box-{version}-linux-amd64.tar.gz` |
 | Android | arm64-v8a | `SFA-{version}-arm64-v8a.apk`、`SFA-{version}-universal.apk` |
 
 ( Windows建议配合Gui For Singbox使用，Gui For Singbox项目地址 ：https://github.com/GUI-for-Cores/GUI.for.SingBox )
