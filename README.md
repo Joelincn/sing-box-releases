@@ -34,7 +34,7 @@
         "tag": "dns-group",
         "strategy": "round_robin",
         "servers": ["dns-a", "dns-b", "dns-c"],
-        "exclude_threshold": 3
+        "exclude_threshold": 10
       }
     ]
   }
@@ -63,7 +63,7 @@
       "tag": "lb-out",
       "outbounds": ["proxy-a", "proxy-b", "proxy-c"],
       "strategy": "round-robin",
-      "exclude_threshold": 5
+      "exclude_threshold": 3
     }
   ]
 }
