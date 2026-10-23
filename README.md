@@ -19,7 +19,7 @@
 | Linux | arm64/amd64 | `sing-box-{version}-linux-arm64.tar.gz`/`sing-box-{version}-linux-amd64.tar.gz` |
 | Android | arm64-v8a | `SFA-{version}-arm64-v8a.apk`、`SFA-{version}-universal.apk` |
 
-( Windows建议配合Gui For Singbox使用，Gui For Singbox项目地址 ：https://github.com/GUI-for-Cores/GUI.for.SingBox )
+( Windows和Linux建议配合Gui For Singbox使用，Gui For Singbox项目地址 ：https://github.com/GUI-for-Cores/GUI.for.SingBox )
 
 ## DNS 轮询策略
 
