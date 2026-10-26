@@ -50,7 +50,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: '1.26.8'
+  GO_VERSION: '1.26.10'
 
 jobs:
   resolve_source:
