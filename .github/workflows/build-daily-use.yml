@@ -79,6 +79,7 @@ jobs:
           test -f sing-box/protocol/group/lb_interrupt_exclude.go || { echo "missing LB interrupt_exclude"; exit 1; }
           grep -q 'InterruptExistConnections' sing-box/option/group.go || { echo "missing LB interrupt_exist_connections"; exit 1; }
           grep -q 'MieruOutboundOptions' sing-box/option/mieru.go || { echo "missing mieru outbound"; exit 1; }
+          grep -q 'SudokuOutbound' sing-box/option/sudoku.go || { echo "missing sudoku outbound"; exit 1; }
           echo "Mustang features OK"
 
       - name: Resolve source commit
